@@ -1,10 +1,12 @@
-# Dify Mobile Chat App
+# Modify - A Dify Mobile Chat App
+
+> Modify = Mobile + Dify
+
+## Overview
+
+Modify, a Dify Mobile Chat App, is a third-party project built using the Dify AI platform. This project is inspired by the [webapp-conversation](https://github.com/langgenius/webapp-conversation) project and is licensed under the MIT License. Currently, this project is independent and is not officially affiliated with Dify.
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%23323330.svg?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/stvlynn)
-
-## Project Overview
-
-Dify Mobile Chat App is a third-party project built using the Dify AI platform. This project is inspired by the [webapp-conversation](https://github.com/langgenius/webapp-conversation) project and is licensed under the MIT License. Note that this project is independent and is not officially affiliated with Dify.
 
 ## Relationship with Dify
 
@@ -44,7 +46,8 @@ Contributions are welcome! You can help by:
 
 ## Star History
 
-[![Star History](https://img.shields.io/github/stars/stvlynn/dify-mobile.svg?style=flat&label=Stars)](https://github.com/stvlynn/dify-mobile)
+[![Star History Chart](https://api.star-history.com/svg?repos=stvlynn/modify&type=Date)](https://star-history.com/#stvlynn/modify&Date)
+
 
 ## License
 
