@@ -1,50 +1,51 @@
-# Welcome to your Expo app 👋
+# Dify Mobile Chat App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%23323330.svg?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/stvlynn)
 
-## Get started
+## Project Overview
 
-1. Install dependencies
+Dify Mobile Chat App is a third-party project built using the Dify AI platform. This project is inspired by the [webapp-conversation](https://github.com/langgenius/webapp-conversation) project and is licensed under the MIT License. Note that this project is independent and is not officially affiliated with Dify.
 
+## Relationship with Dify
+
+Dify Mobile Chat App leverages the Dify AI platform but remains an independent, third-party work. It is not officially maintained by Dify. The project draws inspiration and reference from [webapp-conversation](https://github.com/langgenius/webapp-conversation), which is also MIT licensed.
+
+## How to Build & Run (React Native)
+
+1. Ensure you have Node.js, Yarn (or npm), and React Native CLI installed.
+2. Install dependencies using:
+   ```bash
+   yarn install
+   ```
+   or
    ```bash
    npm install
    ```
-
-2. Start the app
-
+3. Start the Metro bundler:
    ```bash
-    npx expo start
+   npx react-native start
    ```
+4. Run the app on your device or simulator:
+   - For iOS:
+     ```bash
+     npx react-native run-ios
+     ```
+   - For Android:
+     ```bash
+     npx react-native run-android
+     ```
 
-In the output, you'll find options to open the app in a
+## Contributions
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Contributions are welcome! You can help by:
+- Fixing bugs
+- Adding new features
+- Enhancing documentation
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Star History
 
-## Get a fresh project
+[![Star History](https://img.shields.io/github/stars/stvlynn/dify-mobile.svg?style=flat&label=Stars)](https://github.com/stvlynn/dify-mobile)
 
-When you're ready, run:
+## License
 
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+This project is licensed under the [MIT License](LICENSE).
