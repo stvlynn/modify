@@ -35,141 +35,81 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  FlatList,
   StyleSheet,
-  Alert,
-  Animated,
-  SafeAreaView,
-  ActivityIndicator,
+  TouchableOpacity,
+  Image,
+  RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { SwipeListView } from 'react-native-swipe-list-view';
-
-const AppItem = ({ item }) => {
-  const appInfo = item.site_info || {};
-  return (
-    <View style={styles.appItem}>
-      <View style={styles.appIconContainer}>
-        <View style={styles.appIcon}>
-          <Text style={styles.appIconText}>🤖</Text>
-        </View>
-      </View>
-      <View style={styles.appInfo}>
-        <Text style={styles.appName}>{appInfo.title || 'Untitled App'}</Text>
-        <Text 
-          style={styles.appDescription}
-          numberOfLines={2}
-        >
-          {appInfo.description || 'No description'}
-        </Text>
-      </View>
-      <Icon name="chevron-forward" size={20} color="#6B7280" />
-    </View>
-  );
-};
+import Logger from '../../utils/logger';
 
 const AppListScreen = ({ navigation }) => {
   const [apps, setApps] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadApps = async () => {
+    try {
+      const storedApps = await AsyncStorage.getItem('apps');
+      if (storedApps) {
+        const parsedApps = JSON.parse(storedApps);
+        // Sort apps by created_at in descending order (newest first)
+        const sortedApps = parsedApps.data.sort((a, b) => b.created_at - a.created_at);
+        setApps(sortedApps);
+      }
+    } catch (error) {
+      Logger.error('AppList', 'Failed to load apps', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadApps();
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     loadApps();
   }, []);
 
-  const loadApps = async () => {
-    try {
-      setLoading(true);
-      const appsJson = await AsyncStorage.getItem('apps');
-      if (appsJson) {
-        setApps(JSON.parse(appsJson));
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load apps');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteApp = (appId) => {
-    Alert.alert(
-      'Delete App',
-      'Are you sure you want to delete this app?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const updatedApps = apps.filter(app => app.id !== appId);
-              await AsyncStorage.setItem('apps', JSON.stringify(updatedApps));
-              setApps(updatedApps);
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete app');
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const handleAppPress = (app) => {
-    console.log('[AppListScreen] App selected:', app);
-    navigation.navigate('Welcome', {
-      appId: app.id,
-      appConfig: {
-        apiUrl: app.apiUrl,
-        appId: app.appId,
-        appKey: app.appKey
-      },
-      mode: 'new_chat',
-    });
-  };
-
-  const renderHiddenItem = (data) => (
-    <View style={styles.rowBack}>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteApp(data.item.id)}
-      >
-        <Icon name="trash-outline" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-    </View>
-  );
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+  const renderAppItem = ({ item }) => {
+    const iconContent = item.icon_type === 'emoji' ? (
+      <View style={[styles.iconContainer, { backgroundColor: item.icon_background }]}>
+        <Text style={styles.emojiIcon}>{item.icon}</Text>
       </View>
+    ) : (
+      <Image
+        source={{ uri: item.icon_url }}
+        style={styles.imageIcon}
+      />
     );
-  }
+
+    return (
+      <TouchableOpacity
+        style={styles.appItem}
+        onPress={() => navigation.navigate('Welcome', { appId: item.id, appConfig: { apiUrl: item.apiUrl, appId: item.appId, appKey: item.appKey }, mode: 'new_chat' })}
+      >
+        {iconContent}
+        <View style={styles.appInfo}>
+          <Text style={styles.appName}>{item.name}</Text>
+          <Text style={styles.appDescription} numberOfLines={2}>
+            {item.description || 'No description'}
+          </Text>
+          <Text style={styles.appMode}>{item.mode}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Applications</Text>
-      </View>
-      <SwipeListView
+    <View style={styles.container}>
+      <FlatList
         data={apps}
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            activeOpacity={0.7}
-            onPress={() => handleAppPress(item)}
-          >
-            <View style={styles.rowFront}>
-              <AppItem item={item} />
-            </View>
-          </TouchableOpacity>
-        )}
-        renderHiddenItem={renderHiddenItem}
-        rightOpenValue={-75}
-        disableRightSwipe
-        keyExtractor={item => item.id}
+        renderItem={renderAppItem}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         contentContainerStyle={styles.listContent}
       />
       <View style={styles.fabContainer}>
@@ -179,65 +119,71 @@ const AppListScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('AppSetup')}
         >
           <Text style={styles.fabText}>Add App</Text>
-          <Icon name="add" size={20} color="#FFFFFF" />
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/ffffff/plus.png' }}
+            style={styles.fabIcon}
+          />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    height: 44,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    backgroundColor: '#f5f5f5',
   },
   listContent: {
     padding: 16,
-    paddingBottom: 80,
   },
-  rowFront: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  rowBack: {
-    flex: 1,
+  appItem: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    backgroundColor: '#EF4444',
+    backgroundColor: 'white',
     borderRadius: 12,
+    padding: 16,
     marginBottom: 12,
-    paddingRight: 15,
-    height: '100%',
-    width: '100%',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  deleteButton: {
-    width: 75,
-    height: '100%',
-    alignItems: 'center',
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  emojiIcon: {
+    fontSize: 24,
+  },
+  imageIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    marginRight: 16,
+  },
+  appInfo: {
+    flex: 1,
+  },
+  appName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#333',
+  },
+  appDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  appMode: {
+    fontSize: 12,
+    color: '#999',
+    textTransform: 'capitalize',
   },
   fabContainer: {
     position: 'absolute',
@@ -268,45 +214,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 8,
   },
-  appItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  appIconContainer: {
-    marginRight: 12,
-  },
-  appIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#EBF5FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  appIconText: {
-    fontSize: 20,
-  },
-  appInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  appName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  appDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+  fabIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#FFFFFF',
   },
 });
 
