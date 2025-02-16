@@ -108,23 +108,27 @@ const LoginScreen = ({ navigation }) => {
             loginProcessed.current = true;
             
             try {
-              const apiPrefix = await Auth.getApiPrefix();
-              const cookies = await Auth.getCookies();
-              const authToken = await Auth.getToken();
-
-              const headers = {
-                'Content-Type': 'application/json',
-                'Cookie': cookies,
-              };
-
-              if (authToken) {
-                headers['Authorization'] = `Bearer ${authToken}`;
+              // Extract tokens from URL
+              const accessToken = parsedUrl.searchParams.get('access_token');
+              const refreshToken = parsedUrl.searchParams.get('refresh_token');
+              
+              if (accessToken) {
+                await AsyncStorage.setItem('auth_token', accessToken);
+                if (refreshToken) {
+                  await AsyncStorage.setItem('refresh_token', refreshToken);
+                }
               }
 
+              // Get the API prefix
+              const apiPrefix = await Auth.getApiPrefix();
+              
+              // Make the /apps request with the token
               const response = await fetch(`${apiPrefix}/apps`, {
                 method: 'GET',
-                headers,
-                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${accessToken}`,
+                },
               });
 
               if (!response.ok) {
@@ -147,25 +151,29 @@ const LoginScreen = ({ navigation }) => {
           // 如果 URL 解析失败，则使用字符串包含检测
           if (url.includes('/apps') && !loginProcessed.current) {
             loginProcessed.current = true;
-            // 执行与上面相同的获取 apps 的逻辑
             try {
-              const apiPrefix = await Auth.getApiPrefix();
-              const cookies = await Auth.getCookies();
-              const authToken = await Auth.getToken();
-
-              const headers = {
-                'Content-Type': 'application/json',
-                'Cookie': cookies,
-              };
-
-              if (authToken) {
-                headers['Authorization'] = `Bearer ${authToken}`;
+              // Extract tokens from URL
+              const urlObj = new URL(url);
+              const accessToken = urlObj.searchParams.get('access_token');
+              const refreshToken = urlObj.searchParams.get('refresh_token');
+              
+              if (accessToken) {
+                await AsyncStorage.setItem('auth_token', accessToken);
+                if (refreshToken) {
+                  await AsyncStorage.setItem('refresh_token', refreshToken);
+                }
               }
 
+              // Get the API prefix
+              const apiPrefix = await Auth.getApiPrefix();
+              
+              // Make the /apps request with the token
               const response = await fetch(`${apiPrefix}/apps`, {
                 method: 'GET',
-                headers,
-                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${accessToken}`,
+                },
               });
 
               if (!response.ok) {

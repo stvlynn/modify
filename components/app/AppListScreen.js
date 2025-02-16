@@ -31,7 +31,7 @@
  * 3. The list item layout in AppItem component
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -41,35 +41,68 @@ import {
   Image,
   RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Logger from '../../utils/logger';
+import Auth from '../../utils/auth';
 
 const AppListScreen = ({ navigation }) => {
   const [apps, setApps] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadApps = async () => {
+  const fetchApps = async () => {
     try {
-      const storedApps = await AsyncStorage.getItem('apps');
-      if (storedApps) {
-        const parsedApps = JSON.parse(storedApps);
-        // Sort apps by created_at in descending order (newest first)
-        const sortedApps = parsedApps.data.sort((a, b) => b.created_at - a.created_at);
-        setApps(sortedApps);
+      const apiPrefix = await Auth.getApiPrefix();
+      const authToken = await AsyncStorage.getItem('auth_token');
+
+      if (!authToken) {
+        Logger.error('AppList', 'No auth token found');
+        return;
       }
+
+      const response = await fetch(`${apiPrefix}/apps`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch apps: ${response.status}`);
+      }
+
+      const data = await response.json();
+      Logger.debug('AppList', 'Successfully fetched apps', { count: data.data.length });
+      
+      // Sort apps by created_at in descending order
+      const sortedApps = data.data.sort((a, b) => b.created_at - a.created_at);
+      setApps(sortedApps);
+      
+      // Store the latest apps data
+      await AsyncStorage.setItem('apps', JSON.stringify(data));
     } catch (error) {
-      Logger.error('AppList', 'Failed to load apps', error);
+      Logger.error('AppList', 'Failed to fetch apps', error);
     }
   };
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadApps();
+    await fetchApps();
     setRefreshing(false);
-  };
+  }, []);
 
+  // 当屏幕获得焦点时刷新一次
+  useFocusEffect(
+    useCallback(() => {
+      fetchApps();
+    }, [])
+  );
+
+  // 每10秒自动刷新一次
   useEffect(() => {
-    loadApps();
+    const intervalId = setInterval(fetchApps, 10000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const renderAppItem = ({ item }) => {
