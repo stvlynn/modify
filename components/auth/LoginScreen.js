@@ -109,14 +109,28 @@ const LoginScreen = ({ navigation }) => {
             
             try {
               // Extract tokens from URL
-              const accessToken = parsedUrl.searchParams.get('access_token');
-              const refreshToken = parsedUrl.searchParams.get('refresh_token');
+              const urlObj = new URL(url);
+              const accessToken = urlObj.searchParams.get('access_token');
+              const refreshToken = urlObj.searchParams.get('refresh_token');
               
               if (accessToken) {
                 await AsyncStorage.setItem('auth_token', accessToken);
                 if (refreshToken) {
                   await AsyncStorage.setItem('refresh_token', refreshToken);
                 }
+
+                // Save instance information
+                const isCloud = urlObj.hostname === 'cloud.dify.ai';
+                const instanceType = isCloud ? INSTANCE_TYPES.CLOUD : INSTANCE_TYPES.CUSTOM;
+                const baseUrl = urlObj.origin;
+
+                await Auth.setInstanceType(instanceType);
+                await Auth.setBaseUrl(baseUrl);
+                
+                Logger.debug('Login', 'Saved instance info', { 
+                  type: instanceType,
+                  baseUrl: baseUrl 
+                });
               }
 
               // Get the API prefix
@@ -162,6 +176,19 @@ const LoginScreen = ({ navigation }) => {
                 if (refreshToken) {
                   await AsyncStorage.setItem('refresh_token', refreshToken);
                 }
+
+                // Save instance information
+                const isCloud = urlObj.hostname === 'cloud.dify.ai';
+                const instanceType = isCloud ? INSTANCE_TYPES.CLOUD : INSTANCE_TYPES.CUSTOM;
+                const baseUrl = urlObj.origin;
+
+                await Auth.setInstanceType(instanceType);
+                await Auth.setBaseUrl(baseUrl);
+                
+                Logger.debug('Login', 'Saved instance info', { 
+                  type: instanceType,
+                  baseUrl: baseUrl 
+                });
               }
 
               // Get the API prefix

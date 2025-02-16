@@ -25,6 +25,7 @@ const STORAGE_KEYS = {
   API_PREFIX: 'api_prefix',
   PUBLIC_API_PREFIX: 'public_api_prefix',
   COOKIES: 'auth_cookies',
+  BASE_URL: 'base_url',
 };
 
 // Instance types
@@ -39,14 +40,15 @@ const CLOUD_INSTANCE_URL = 'https://cloud.dify.ai';
 class Auth {
   static isAuthenticated = false;
   static instanceUrl = CLOUD_INSTANCE_URL;
-  static instanceType = INSTANCE_TYPES.CLOUD;
+  static instanceType = '';
   static apiPrefix = '';
   static publicApiPrefix = '';
   static cookies = '';
+  static baseUrl = '';
 
   static async initialize() {
     try {
-      const [token, refreshToken, url, type, apiPrefix, publicApiPrefix, cookies] = await Promise.all([
+      const [token, refreshToken, url, type, apiPrefix, publicApiPrefix, cookies, baseUrl] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN),
         AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
         AsyncStorage.getItem(STORAGE_KEYS.INSTANCE_URL),
@@ -54,6 +56,7 @@ class Auth {
         AsyncStorage.getItem(STORAGE_KEYS.API_PREFIX),
         AsyncStorage.getItem(STORAGE_KEYS.PUBLIC_API_PREFIX),
         AsyncStorage.getItem(STORAGE_KEYS.COOKIES),
+        AsyncStorage.getItem(STORAGE_KEYS.BASE_URL),
       ]);
 
       Logger.debug('Auth', 'Initializing auth state', { 
@@ -63,7 +66,8 @@ class Auth {
         type,
         apiPrefix,
         publicApiPrefix,
-        hasCookies: !!cookies
+        hasCookies: !!cookies,
+        baseUrl,
       });
 
       this.isAuthenticated = !!token && !!cookies;
@@ -72,6 +76,7 @@ class Auth {
       this.apiPrefix = apiPrefix || '';
       this.publicApiPrefix = publicApiPrefix || '';
       this.cookies = cookies || '';
+      this.baseUrl = baseUrl || '';
 
       if (token) {
         // Check token expiration
@@ -183,19 +188,68 @@ class Auth {
     return this.cookies || '';
   }
 
+  static async getInstanceType() {
+    try {
+      const type = await AsyncStorage.getItem(STORAGE_KEYS.INSTANCE_TYPE);
+      Logger.debug('Auth', 'Getting instance type', { type });
+      return type || '';
+    } catch (error) {
+      Logger.error('Auth', 'Failed to get instance type', error);
+      return '';
+    }
+  }
+
+  static async setInstanceType(type) {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.INSTANCE_TYPE, type);
+      this.instanceType = type;
+      Logger.debug('Auth', 'Instance type set', { type });
+    } catch (error) {
+      Logger.error('Auth', 'Failed to set instance type', error);
+    }
+  }
+
+  static async getBaseUrl() {
+    try {
+      const baseUrl = await AsyncStorage.getItem(STORAGE_KEYS.BASE_URL);
+      Logger.debug('Auth', 'Getting base url', { baseUrl });
+      return baseUrl || '';
+    } catch (error) {
+      Logger.error('Auth', 'Failed to get base url', error);
+      return '';
+    }
+  }
+
+  static async setBaseUrl(url) {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.BASE_URL, url);
+      this.baseUrl = url;
+      Logger.debug('Auth', 'Base url set', { url });
+    } catch (error) {
+      Logger.error('Auth', 'Failed to set base url', error);
+    }
+  }
+
   static async logout() {
     try {
       await AsyncStorage.multiRemove([
         STORAGE_KEYS.AUTH_TOKEN,
         STORAGE_KEYS.REFRESH_TOKEN,
+        STORAGE_KEYS.INSTANCE_URL,
+        STORAGE_KEYS.INSTANCE_TYPE,
         STORAGE_KEYS.API_PREFIX,
         STORAGE_KEYS.PUBLIC_API_PREFIX,
         STORAGE_KEYS.COOKIES,
+        STORAGE_KEYS.BASE_URL,
+        'apps',
+        'isAuthenticated',
       ]);
       this.isAuthenticated = false;
+      this.instanceType = '';
       this.apiPrefix = '';
       this.publicApiPrefix = '';
       this.cookies = '';
+      this.baseUrl = '';
       Logger.debug('Auth', 'Logged out successfully');
     } catch (error) {
       Logger.error('Auth', 'Failed to logout', error);
@@ -216,21 +270,9 @@ class Auth {
     await AsyncStorage.setItem('isAuthenticated', value ? 'true' : 'false');
   }
 
-  static setInstanceType(type) {
-    Auth.instanceType = type;
-  }
-
   static getSignInUrl() {
     // Assuming cloud login URL is constructed based on the CLOUD_INSTANCE_URL
     return `${CLOUD_INSTANCE_URL}/signin`;
-  }
-
-  static setCookies(cookieString) {
-    this.cookies = cookieString;
-  }
-
-  static async getCookies() {
-    return this.cookies;
   }
 
   static async getToken() {

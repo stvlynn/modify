@@ -10,26 +10,67 @@
  * - Screen protection based on auth state
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 import LoginScreen from '../components/auth/LoginScreen';
 import AppListScreen from '../components/app/AppListScreen';
+import AccountScreen from '../components/account/AccountScreen';
 import AppSetupScreen from '../components/app/AppSetupScreen';
 import WelcomeScreen from '../components/welcome/WelcomeScreen';
-import ChatScreen from '../components/chat/ChatScreen';
 import VariableEditScreen from '../components/variables/VariableEditScreen';
+import ChatScreen from '../components/chat/ChatScreen';
 
 import Auth from '../utils/auth';
 import Logger from '../utils/logger';
 
 const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
+const AppTabs = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: '#2563eb',
+        tabBarInactiveTintColor: '#6b7280',
+        tabBarStyle: {
+          borderTopWidth: 1,
+          borderTopColor: '#e5e7eb',
+          backgroundColor: 'white',
+        },
+      }}
+    >
+      <Tab.Screen
+        name="Apps"
+        component={AppListScreen}
+        options={{
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="apps" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="person" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+};
 
 const AppNavigator = () => {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const checkAuthState = async () => {
       try {
         const isAuth = await Auth.checkAuthState();
@@ -44,7 +85,7 @@ const AppNavigator = () => {
     checkAuthState();
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(async () => {
       const isAuth = await Auth.checkAuthState();
       setIsAuthenticated(isAuth);
@@ -68,11 +109,7 @@ const AppNavigator = () => {
         />
       ) : (
         <>
-          <Stack.Screen
-            name="AppList"
-            component={AppListScreen}
-            options={{ headerShown: false }}
-          />
+          <Stack.Screen name="Main" component={AppTabs} />
           <Stack.Screen
             name="AppSetup"
             component={AppSetupScreen}
