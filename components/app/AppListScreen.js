@@ -45,10 +45,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Logger from '../../utils/logger';
 import Auth from '../../utils/auth';
+import ApiKeyModal from '../common/ApiKeyModal';
 
 const AppListScreen = ({ navigation }) => {
   const [apps, setApps] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedApp, setSelectedApp] = useState(null);
+  const [isApiKeyModalVisible, setIsApiKeyModalVisible] = useState(false);
 
   const fetchApps = async () => {
     try {
@@ -105,6 +108,114 @@ const AppListScreen = ({ navigation }) => {
     return () => clearInterval(intervalId);
   }, []);
 
+  const handleAppPress = async (app) => {
+    try {
+      // 获取存储的 API Key
+      const storedApiKey = await AsyncStorage.getItem(`app_${app.id}_api_key`);
+      
+      if (!storedApiKey) {
+        // 如果没有 API Key，显示弹窗
+        console.log('[DEBUG] No API Key found, showing modal');
+        setSelectedApp(app);
+        setIsApiKeyModalVisible(true);
+        return;
+      }
+
+      // 验证 API Key
+      console.log('[DEBUG] Validating stored API Key');
+      const isValid = await validateApiKey(app.id, storedApiKey);
+
+      if (!isValid) {
+        // 如果 API Key 无效，显示弹窗
+        console.log('[DEBUG] API Key invalid, showing modal');
+        setSelectedApp(app);
+        setIsApiKeyModalVisible(true);
+        return;
+      }
+
+      // API Key 有效，获取 API URL
+      const instanceType = await Auth.getInstanceType();
+      const apiUrl = instanceType === 'cloud' 
+        ? 'https://api.dify.ai/v1'
+        : await Auth.getPublicApiPrefix();
+
+      console.log('[DEBUG] API Key valid, navigating to Welcome screen');
+      navigation.navigate('Welcome', {
+        appId: app.id,
+        appConfig: {
+          apiUrl: apiUrl,
+          appId: app.id,
+          appKey: storedApiKey,
+        },
+        mode: 'new_chat',
+      });
+    } catch (error) {
+      console.error('[ERROR] Failed to handle app press:', error);
+      Alert.alert(
+        'Error',
+        'Failed to access the app. Please try again later.'
+      );
+    }
+  };
+
+  const validateApiKey = async (appId, apiKey) => {
+    try {
+      // 使用本地 IP 地址替代 localhost
+      const apiUrl = 'http://192.168.1.2:3000/api/apps/validate';
+      console.log('[DEBUG] Validating API Key at URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ app_id: appId })
+      });
+
+      console.log('[DEBUG] Validation response status:', response.status);
+      const responseText = await response.text();
+      console.log('[DEBUG] Raw response:', responseText);
+
+      let isValid = false;
+      try {
+        const data = JSON.parse(responseText);
+        isValid = data.valid === true;
+      } catch (parseError) {
+        console.error('[ERROR] Failed to parse response:', parseError);
+      }
+
+      if (!isValid) {
+        Logger.error('AppList', 'API Key validation failed', {
+          status: response.status,
+          statusText: response.statusText,
+          response: responseText
+        });
+        return false;
+      }
+
+      // 保存有效的 API key，使用一致的键名格式
+      if (isValid) {
+        try {
+          const storageKey = `app_${appId}_api_key`;
+          await AsyncStorage.setItem(storageKey, apiKey);
+          console.log('[DEBUG] API key saved with key:', storageKey);
+        } catch (storageError) {
+          Logger.error('AppList', 'Failed to save API key', storageError);
+          // 即使存储失败，仍然返回验证成功
+        }
+      }
+
+      return isValid;
+    } catch (error) {
+      Logger.error('AppList', 'Error validating API key', {
+        error: error.message,
+        stack: error.stack
+      });
+      return false;
+    }
+  };
+
   const renderAppItem = ({ item }) => {
     const iconContent = item.icon_type === 'emoji' ? (
       <View style={[styles.iconContainer, { backgroundColor: item.icon_background }]}>
@@ -120,7 +231,7 @@ const AppListScreen = ({ navigation }) => {
     return (
       <TouchableOpacity
         style={styles.appItem}
-        onPress={() => navigation.navigate('Welcome', { appId: item.id, appConfig: { apiUrl: item.apiUrl, appId: item.appId, appKey: item.appKey }, mode: 'new_chat' })}
+        onPress={() => handleAppPress(item)}
       >
         {iconContent}
         <View style={styles.appInfo}>
@@ -158,6 +269,18 @@ const AppListScreen = ({ navigation }) => {
           />
         </TouchableOpacity>
       </View>
+
+      <ApiKeyModal
+        visible={isApiKeyModalVisible}
+        onClose={() => setIsApiKeyModalVisible(false)}
+        selectedApp={selectedApp}
+        validateApiKey={validateApiKey}
+        onSuccess={() => {
+          // 刷新应用列表
+          fetchApps();
+          setIsApiKeyModalVisible(false);
+        }}
+      />
     </View>
   );
 };

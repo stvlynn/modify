@@ -15,6 +15,8 @@ const AccountScreen = ({ navigation }) => {
   const [accountInfo, setAccountInfo] = useState({
     baseUrl: '',
     instanceType: '',
+    apiUrl: '',
+    publicApiUrl: '',
   });
 
   useEffect(() => {
@@ -23,14 +25,30 @@ const AccountScreen = ({ navigation }) => {
 
   const loadAccountInfo = async () => {
     try {
-      const baseUrl = await Auth.getBaseUrl();
-      const instanceType = await Auth.getInstanceType();
+      const [baseUrl, instanceType, apiPrefix, publicApiPrefix] = await Promise.all([
+        Auth.getBaseUrl(),
+        Auth.getInstanceType(),
+        Auth.getApiPrefix(),
+        Auth.getPublicApiPrefix(),
+      ]);
       
+      const apiUrl = instanceType === 'cloud' 
+        ? 'https://api.dify.ai/v1'
+        : publicApiPrefix;
+
       setAccountInfo({
         baseUrl: baseUrl || 'Unknown',
         instanceType: instanceType || 'Unknown',
+        apiUrl: apiUrl || 'Unknown',
+        publicApiUrl: publicApiPrefix || 'Unknown',
       });
-      Logger.debug('Account', 'Account info loaded', { baseUrl, instanceType });
+      
+      Logger.debug('Account', 'Account info loaded', { 
+        baseUrl, 
+        instanceType,
+        apiUrl,
+        publicApiUrl: publicApiPrefix
+      });
     } catch (error) {
       Logger.error('Account', 'Failed to load account info', error);
     }
@@ -51,13 +69,15 @@ const AccountScreen = ({ navigation }) => {
           onPress: async () => {
             try {
               await Auth.logout();
-              Logger.debug('Account', 'Successfully logged out');
+              navigation.replace('Login');
             } catch (error) {
               Logger.error('Account', 'Failed to logout', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
             }
           },
         },
       ],
+      { cancelable: true }
     );
   };
 
@@ -65,18 +85,34 @@ const AccountScreen = ({ navigation }) => {
     <ScrollView style={styles.container}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Instance Information</Text>
+        
         <View style={styles.infoItem}>
-          <Text style={styles.label}>Base URL</Text>
+          <Text style={styles.label}>Type:</Text>
+          <Text style={styles.value}>
+            {accountInfo.instanceType === 'cloud' ? 'Dify Cloud' : 'Self-hosted'}
+          </Text>
+        </View>
+
+        <View style={styles.infoItem}>
+          <Text style={styles.label}>Base URL:</Text>
           <Text style={styles.value}>{accountInfo.baseUrl}</Text>
         </View>
+
         <View style={styles.infoItem}>
-          <Text style={styles.label}>Instance Type</Text>
-          <Text style={styles.value}>{accountInfo.instanceType}</Text>
+          <Text style={styles.label}>API URL:</Text>
+          <Text style={styles.value}>{accountInfo.apiUrl}</Text>
         </View>
+
+        {accountInfo.instanceType !== 'cloud' && (
+          <View style={styles.infoItem}>
+            <Text style={styles.label}>Public API URL:</Text>
+            <Text style={styles.value}>{accountInfo.publicApiUrl}</Text>
+          </View>
+        )}
       </View>
 
-      <TouchableOpacity
-        style={styles.logoutButton}
+      <TouchableOpacity 
+        style={styles.logoutButton} 
         onPress={handleLogout}
       >
         <Text style={styles.logoutButtonText}>Logout</Text>
@@ -92,44 +128,46 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: 'white',
-    margin: 16,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginVertical: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginHorizontal: 10,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    marginBottom: 15,
     color: '#333',
-    marginBottom: 16,
   },
   infoItem: {
-    marginBottom: 12,
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   label: {
-    fontSize: 14,
+    flex: 1,
+    fontSize: 16,
     color: '#666',
-    marginBottom: 4,
   },
   value: {
+    flex: 2,
     fontSize: 16,
     color: '#333',
   },
   logoutButton: {
-    backgroundColor: '#ef4444',
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: '#ff3b30',
+    marginHorizontal: 10,
+    marginVertical: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
   logoutButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
 
