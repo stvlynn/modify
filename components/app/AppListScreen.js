@@ -160,57 +160,49 @@ const AppListScreen = ({ navigation }) => {
 
   const validateApiKey = async (appId, apiKey) => {
     try {
-      // 使用本地 IP 地址替代 localhost
-      const apiUrl = 'http://192.168.1.2:3000/api/apps/validate';
-      console.log('[DEBUG] Validating API Key at URL:', apiUrl);
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ app_id: appId })
-      });
+      console.log('[DEBUG] Validating API key for app:', appId);
 
-      console.log('[DEBUG] Validation response status:', response.status);
-      const responseText = await response.text();
-      console.log('[DEBUG] Raw response:', responseText);
-
-      let isValid = false;
-      try {
-        const data = JSON.parse(responseText);
-        isValid = data.valid === true;
-      } catch (parseError) {
-        console.error('[ERROR] Failed to parse response:', parseError);
+      // 基本格式验证
+      if (!apiKey.startsWith('app-')) {
+        throw new Error('Invalid API key format. API key must start with "app-"');
       }
 
-      if (!isValid) {
-        Logger.error('AppList', 'API Key validation failed', {
-          status: response.status,
-          statusText: response.statusText,
-          response: responseText
-        });
+      if (apiKey.length < 20) {
+        throw new Error('Invalid API key length. API key is too short.');
+      }
+
+      // 验证 API Key 是否可用
+      const instanceType = await Auth.getInstanceType();
+      const apiUrl = instanceType === 'cloud' 
+        ? 'https://api.dify.ai/v1'
+        : await Auth.getPublicApiPrefix();
+
+      // 测试 API Key 是否可用，尝试获取应用参数
+      const response = await fetch(`${apiUrl}/parameters`, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API key validation failed: ${response.status}`);
+      }
+
+      // API Key 验证成功，保存到 AsyncStorage
+      try {
+        const storageKey = `app_${appId}_api_key`;
+        await AsyncStorage.setItem(storageKey, apiKey);
+        console.log('[DEBUG] API key saved with key:', storageKey);
+      } catch (storageError) {
+        Logger.error('AppList', 'Failed to save API key', storageError);
         return false;
       }
 
-      // 保存有效的 API key，使用一致的键名格式
-      if (isValid) {
-        try {
-          const storageKey = `app_${appId}_api_key`;
-          await AsyncStorage.setItem(storageKey, apiKey);
-          console.log('[DEBUG] API key saved with key:', storageKey);
-        } catch (storageError) {
-          Logger.error('AppList', 'Failed to save API key', storageError);
-          // 即使存储失败，仍然返回验证成功
-        }
-      }
-
-      return isValid;
+      return true;
     } catch (error) {
       Logger.error('AppList', 'Error validating API key', {
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
       return false;
     }

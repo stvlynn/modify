@@ -2,48 +2,24 @@
  * VariableEditScreen.js
  * 
  * Purpose:
- * Manages the configuration of chat variables required by Dify applications.
- * Provides a user interface for setting and updating variable values.
+ * Screen for editing and managing chat variables before starting a conversation.
  * 
  * Features:
- * - Dynamic variable input fields
- * - Validation for required fields
- * - Value persistence
- * - Real-time validation
+ * - Fetches and displays variable configuration
+ * - Handles variable input validation
+ * - Manages variable state
+ * - Navigates to chat after validation
  * 
  * Technical Implementation:
- * - Uses React Native's ScrollView for form display
- * - Implements form validation logic
- * - Manages variable state and persistence
- * - Handles keyboard interactions
- * 
- * Data Flow:
- * - Receives variable definitions from parent
- * - Manages variable values state
- * - Validates input values
- * - Returns updated values to parent
- * 
- * Props (via route.params):
- * - variables: Array<{
- *     key: string,
- *     name: string,
- *     required: boolean,
- *     type: string
- *   }>
- * - savedInputs: Record<string, string>
- * - onInputsChange: (inputs: Record<string, string>) => void
- * - returnScreen: string
- * 
- * Connected Components:
- * - Previous: WelcomeScreen, ChatScreen
- * - Next: ChatScreen (on completion)
+ * - Uses fetch API for variable configuration
+ * - Implements form validation
+ * - Manages navigation state
  * 
  * Note to LLMs:
  * If modifying this file's functionality, please update:
- * 1. The variable validation logic
- * 2. The form handling
+ * 1. The variable fetching logic
+ * 2. The validation mechanisms
  * 3. The navigation flow
- * 4. The error handling
  * And don't forget to update this documentation header.
  */
 
@@ -57,15 +33,17 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import Logger from '../../utils/logger';
 import VariableInput from './VariableInput';
 
 const VariableEditScreen = ({ navigation, route }) => {
-  const { appConfig, mode, onComplete, returnScreen } = route.params;
+  const { appConfig, mode, returnScreen } = route.params;
   const [variables, setVariables] = useState([]);
   const [inputs, setInputs] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -74,65 +52,36 @@ const VariableEditScreen = ({ navigation, route }) => {
     fetchVariables();
   }, []);
 
-  useEffect(() => {
-    console.log('[VariableEditScreen] Variables changed:', variables);
-    console.log('[VariableEditScreen] Loading state:', isLoading);
-    console.log('[VariableEditScreen] Error state:', error);
-    
-    if (variables.length === 0 && !isLoading && !error) {
-      console.log('[VariableEditScreen] No variables found, navigating to returnScreen');
-      handleComplete({}, []);
-    }
-  }, [variables, isLoading, error]);
-
   const fetchVariables = async () => {
-    console.log('[VariableEditScreen] Fetching variables...');
-    console.log('[VariableEditScreen] API URL:', `${appConfig.apiUrl}/parameters`);
-    
     try {
+      console.log('[VariableEditScreen] Fetching variables...');
+      console.log('[VariableEditScreen] API URL:', `${appConfig.apiUrl}/parameters`);
+      console.log('[VariableEditScreen] App Key:', appConfig.appKey);
+
       const response = await fetch(`${appConfig.apiUrl}/parameters`, {
         headers: {
           'Authorization': `Bearer ${appConfig.appKey}`,
         },
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to fetch variables');
+        throw new Error(`Failed to fetch variables: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('[VariableEditScreen] API Response:', data);
+      console.log('[VariableEditScreen] Full API Response:', JSON.stringify(data, null, 2));
+
+      // 提取用户输入表单
+      const userInputForm = data.user_input_form || [];
+      console.log('[VariableEditScreen] Extracted user input form:', JSON.stringify(userInputForm, null, 2));
       
-      // 从 user_input_form 中提取变量
-      const formVariables = data.user_input_form || [];
-      const extractedVariables = formVariables.map(item => {
-        const [type, config] = Object.entries(item)[0];
-        return {
-          key: config.variable,
-          name: config.label,
-          type: type === 'text-input' ? 'text' : type,
-          required: config.required,
-          options: config.options,
-        };
-      });
-      
-      console.log('[VariableEditScreen] Extracted variables:', extractedVariables);
-      setVariables(extractedVariables);
-      
-      // Initialize inputs with empty values
-      const initialInputs = {};
-      extractedVariables.forEach(item => {
-        initialInputs[item.key] = item.type === 'select' && item.options?.length 
-          ? item.options[0].value 
-          : '';
-      });
-      setInputs(initialInputs);
-      console.log('[VariableEditScreen] Initial inputs:', initialInputs);
+      setVariables(userInputForm);
+      setLoading(false);
     } catch (error) {
       console.error('[VariableEditScreen] Error fetching variables:', error);
       setError('Failed to load configuration. Please check your connection and try again.');
-    } finally {
-      setIsLoading(false);
+      setLoading(false);
+      Logger.error('VariableEditScreen', 'Error fetching variables', error);
     }
   };
 
@@ -140,25 +89,36 @@ const VariableEditScreen = ({ navigation, route }) => {
     setInputs(newInputs);
   };
 
-  const handleComplete = (inputs, variables) => {
-    if (returnScreen === 'Chat') {
-      navigation.replace('Chat', {
-        appConfig,
-        variables,
-        inputs,
-        hasSetInputs: true,
-        mode,
-      });
-    } else if (onComplete) {
-      onComplete(variables, inputs);
+  const handleStartChat = (finalInputs) => {
+    // 验证所有必填字段
+    const missingRequiredFields = variables.filter(variable => {
+      const config = variable['text-input'] || variable['select'];
+      if (!config) return false;
+      return config.required && !finalInputs[config.variable];
+    });
+
+    if (missingRequiredFields.length > 0) {
+      const fieldNames = missingRequiredFields
+        .map(v => (v['text-input'] || v['select']).label)
+        .join(', ');
+      Alert.alert(
+        'Required Fields',
+        `Please fill in the following required fields: ${fieldNames}`
+      );
+      return;
     }
+
+    // 导航到聊天界面
+    navigation.navigate(returnScreen || 'Chat', {
+      appConfig,
+      variables,
+      inputs: finalInputs,
+      hasSetInputs: true,
+      mode,
+    });
   };
 
-  const handleStartChat = (newInputs) => {
-    handleComplete(newInputs, variables);
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -208,7 +168,6 @@ const VariableEditScreen = ({ navigation, route }) => {
               savedInputs={inputs}
               onInputsChange={handleInputsChange}
               onStartChat={handleStartChat}
-              canEdit={true}
             />
           </View>
         </ScrollView>

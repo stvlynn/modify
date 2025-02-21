@@ -4,159 +4,167 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  Modal,
-  Pressable,
+  ScrollView,
+  Animated,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
 
-const VariableInput = ({ 
-  variables = [], 
-  savedInputs = {}, 
+// 启用 LayoutAnimation 在 Android 上的支持
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
+
+const VariableInput = ({
+  variables,
+  savedInputs,
   onInputsChange,
   onStartChat,
-  canEdit = true,
 }) => {
-  const [inputs, setInputs] = useState({});
-  const [selectedVariable, setSelectedVariable] = useState(null);
-  const [showOptions, setShowOptions] = useState(false);
+  const [inputs, setInputs] = useState(savedInputs || {});
+  const [expandedSelect, setExpandedSelect] = useState(null);
 
   useEffect(() => {
-    if (savedInputs && Object.keys(savedInputs).length > 0) {
-      setInputs(savedInputs);
-    } else {
-      const initialInputs = {};
-      variables.forEach(item => {
-        initialInputs[item.key] = item.type === 'select' && item.options?.length 
-          ? item.options[0].value 
-          : '';
-      });
-      setInputs(initialInputs);
-    }
-  }, [savedInputs, variables]);
+    console.log('[VariableInput] Component mounted');
+    console.log('[VariableInput] Initial variables:', JSON.stringify(variables, null, 2));
+    console.log('[VariableInput] Initial savedInputs:', JSON.stringify(savedInputs, null, 2));
+  }, []);
 
-  const handleInputChange = (key, value) => {
-    const newInputs = {
-      ...inputs,
-      [key]: value,
-    };
+  useEffect(() => {
+    if (savedInputs) {
+      console.log('[VariableInput] Updating inputs with savedInputs:', JSON.stringify(savedInputs, null, 2));
+      setInputs(savedInputs);
+    }
+  }, [savedInputs]);
+
+  const handleInputChange = (variable, value) => {
+    console.log('[VariableInput] Input change:', { variable, value });
+    const newInputs = { ...inputs, [variable]: value };
+    console.log('[VariableInput] New inputs state:', newInputs);
     setInputs(newInputs);
     onInputsChange?.(newInputs);
   };
 
-  const handleStartChat = () => {
-    onStartChat?.(inputs);
+  const toggleSelect = (variable) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedSelect(expandedSelect === variable ? null : variable);
   };
 
-  const renderSelectInput = (variable) => {
-    const selectedOption = variable.options.find(opt => opt.value === inputs[variable.key]);
-    
-    return (
-      <View>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => {
-            if (canEdit) {
-              setSelectedVariable(variable);
-              setShowOptions(true);
-            }
-          }}
-          disabled={!canEdit}
-        >
-          <Text style={styles.selectButtonText}>
-            {selectedOption?.label || 'Select an option'}
-          </Text>
-          <Icon name="chevron-down" size={20} color="#6B7280" />
-        </TouchableOpacity>
+  const renderLabel = (label, required) => (
+    <View style={styles.labelContainer}>
+      <Text style={styles.label}>{label}</Text>
+      {required && <Text style={styles.required}>*</Text>}
+    </View>
+  );
 
-        <Modal
-          visible={showOptions && selectedVariable?.key === variable.key}
-          transparent={true}
-          animationType="slide"
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{variable.name}</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowOptions(false);
-                    setSelectedVariable(null);
-                  }}
-                >
-                  <Icon name="close" size={24} color="#1F2937" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView style={styles.optionsList}>
-                {variable.options.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    style={[
-                      styles.optionItem,
-                      inputs[variable.key] === option.value && styles.optionItemSelected
-                    ]}
-                    onPress={() => {
-                      handleInputChange(variable.key, option.value);
-                      setShowOptions(false);
-                      setSelectedVariable(null);
-                    }}
-                  >
-                    <Text 
-                      style={[
-                        styles.optionText,
-                        inputs[variable.key] === option.value && styles.optionTextSelected
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                    {inputs[variable.key] === option.value && (
-                      <Icon name="checkmark" size={20} color="#FFFFFF" />
-                    )}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+  const renderTextInput = (config) => {
+    const { label, variable, required = false, placeholder = '', max_length } = config;
+    return (
+      <View style={styles.inputGroup} key={variable}>
+        {renderLabel(label, required)}
+        <TextInput
+          style={styles.input}
+          value={inputs[variable] || ''}
+          onChangeText={(text) => handleInputChange(variable, text)}
+          placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+          placeholderTextColor="#999"
+          maxLength={max_length}
+        />
       </View>
     );
   };
 
-  const renderInput = (variable) => {
-    if (variable.type === 'select') {
-      return renderSelectInput(variable);
-    }
+  const renderSelectInput = (config) => {
+    const { label, variable, required = false, options = [] } = config;
+    const selectedValue = inputs[variable] || '';
+    const isExpanded = expandedSelect === variable;
 
     return (
-      <TextInput
-        style={styles.input}
-        value={inputs[variable.key]}
-        onChangeText={(value) => handleInputChange(variable.key, value)}
-        placeholder={`Enter ${variable.name}`}
-        editable={canEdit}
-      />
+      <View style={styles.inputGroup} key={variable}>
+        {renderLabel(label, required)}
+        <View style={styles.selectContainer}>
+          <TouchableOpacity
+            style={[
+              styles.selectButton,
+              isExpanded && styles.selectButtonExpanded
+            ]}
+            onPress={() => toggleSelect(variable)}
+          >
+            <Text style={[
+              styles.selectButtonText,
+              !selectedValue && styles.placeholder
+            ]}>
+              {selectedValue || `Select ${label.toLowerCase()}`}
+            </Text>
+            <Text style={[
+              styles.selectArrow,
+              isExpanded && styles.selectArrowExpanded
+            ]}>
+              ▼
+            </Text>
+          </TouchableOpacity>
+          {isExpanded && (
+            <View style={styles.optionsContainer}>
+              {options.map((option, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.optionItem,
+                    selectedValue === option && styles.optionItemSelected,
+                    index === options.length - 1 && styles.optionItemLast
+                  ]}
+                  onPress={() => {
+                    handleInputChange(variable, option);
+                    toggleSelect(variable);
+                  }}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    selectedValue === option && styles.optionTextSelected
+                  ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
     );
   };
 
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {variables.map((variable) => (
-          <View key={variable.key} style={styles.inputContainer}>
-            <Text style={styles.label}>{variable.name}</Text>
-            {renderInput(variable)}
-          </View>
-        ))}
+        <View style={styles.form}>
+          {variables.map((variable) => {
+            console.log('[VariableInput] Rendering variable:', JSON.stringify(variable, null, 2));
+            if (variable['text-input']) {
+              return renderTextInput(variable['text-input']);
+            }
+            if (variable['select']) {
+              return renderSelectInput(variable['select']);
+            }
+            return null;
+          })}
+        </View>
       </ScrollView>
-      
-      <TouchableOpacity 
-        style={styles.startButton}
-        onPress={handleStartChat}
-      >
-        <Text style={styles.startButtonText}>Start Chat</Text>
-        <Icon name="arrow-forward" size={20} color="#fff" />
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => {
+            console.log('[VariableInput] Start chat pressed with inputs:', JSON.stringify(inputs, null, 2));
+            onStartChat(inputs);
+          }}
+        >
+          <Text style={styles.buttonText}>Start Chat</Text>
+          <Text style={styles.buttonIcon}>→</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -165,103 +173,122 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 16,
   },
   scrollView: {
     flex: 1,
   },
-  inputContainer: {
-    marginBottom: 16,
+  form: {
+    padding: 16,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  required: {
+    color: '#EF4444',
+    marginLeft: 4,
+    fontSize: 16,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    fontSize: 15,
-    color: '#1F2937',
-    backgroundColor: '#F9FAFB',
+    fontSize: 16,
+    color: '#1a1a1a',
+    backgroundColor: '#fff',
+  },
+  selectContainer: {
+    position: 'relative',
   },
   selectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectButtonExpanded: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomWidth: 0,
   },
   selectButtonText: {
-    fontSize: 15,
-    color: '#1F2937',
-  },
-  modalContainer: {
+    fontSize: 16,
+    color: '#1a1a1a',
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  modalContent: {
+  selectArrow: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+  },
+  selectArrowExpanded: {
+    transform: [{ rotate: '180deg' }],
+  },
+  placeholder: {
+    color: '#999',
+  },
+  optionsContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  optionsList: {
-    padding: 8,
+    maxHeight: 200,
   },
   optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderRadius: 8,
-    marginVertical: 4,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   optionItemSelected: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#f3f4f6',
+  },
+  optionItemLast: {
+    borderBottomWidth: 0,
   },
   optionText: {
     fontSize: 16,
-    color: '#1F2937',
+    color: '#1a1a1a',
   },
   optionTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '500',
+    color: '#2563EB',
   },
-  startButton: {
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  button: {
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563EB',
-    padding: 14,
-    borderRadius: 8,
-    marginTop: 24,
   },
-  startButtonText: {
+  buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
     marginRight: 8,
+  },
+  buttonIcon: {
+    color: '#fff',
+    fontSize: 20,
   },
 });
 
