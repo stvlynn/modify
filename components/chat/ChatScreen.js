@@ -163,29 +163,25 @@ const ChatScreen = ({ navigation, route }) => {
       return;
     }
 
-    const userMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: inputText.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputText('');
-    setIsLoading(true);
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
     try {
-      console.log('[ChatScreen] Sending message:', {
-        inputs,
-        query: inputText.trim(),
-        user: appConfig.user || 'default',
-      });
+      setIsLoading(true);
 
+      // 创建新的消息
+      const userMessage = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: inputText,
+        timestamp: new Date().toISOString(),
+      };
+
+      // 更新消息列表
+      setMessages(prev => [...prev, userMessage]);
+      setInputText('');
+
+      // 创建 AbortController
+      abortControllerRef.current = new AbortController();
+
+      // 发送请求
       const response = await fetch(`${appConfig.apiUrl}/chat-messages`, {
         method: 'POST',
         headers: {
@@ -194,47 +190,47 @@ const ChatScreen = ({ navigation, route }) => {
         },
         body: JSON.stringify({
           inputs,
-          query: inputText.trim(),
-          user: appConfig.user || 'default',
-          response_mode: 'blocking',  
+          query: inputText,
+          user: 'default',
+          response_mode: 'blocking',
+          conversation_id: null,
+          files: []
         }),
         signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to send message');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('[ChatScreen] Response received:', data);
+      console.log('[ChatScreen] API response:', data);
 
       // 处理响应
-      if (data.answer) {
-        const assistantMessage = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: data.answer,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-      }
-      
-      setIsLoading(false);
+      const assistantMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: data.answer,
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      if (error.name === 'AbortError') {
-        return;
-      }
       console.error('[ChatScreen] Error sending message:', error);
-      // 添加错误消息到对话
+
+      // 显示错误消息
       const errorMessage = {
         id: Date.now().toString(),
         role: 'error',
-        content: 'Failed to send message. Please try again.',
-        timestamp: new Date(),
+        content: error.message || 'Failed to send message',
+        timestamp: new Date().toISOString(),
       };
+
       setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
