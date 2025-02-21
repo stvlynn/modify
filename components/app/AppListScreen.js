@@ -2,33 +2,33 @@
  * AppListScreen.js
  * 
  * Purpose:
- * Displays a list of configured Dify applications and allows users to manage them.
- * This is the main entry point after onboarding where users can select which app to chat with.
+ * Displays a list of available Dify applications and manages API key validation.
+ * This is the main entry point after login where users can select an app to interact with.
  * 
  * Features:
- * - Displays list of saved Dify applications with their info
- * - Supports swipe-to-delete functionality for removing apps
- * - Floating action button to add new applications
+ * - Lists all available Dify applications
+ * - Handles API key validation and storage
+ * - Manages navigation to chat interface
+ * - Supports both cloud and self-hosted instances
  * 
- * Navigation Flow:
- * - When clicking an app: Navigates to WelcomeScreen with app configuration
- * - When clicking add button: Navigates to AppSetupScreen
- * 
- * Data Flow:
- * - Reads app configurations from AsyncStorage
- * - Passes selected app config to WelcomeScreen for chat initialization
+ * Technical Implementation:
+ * - Uses React Native's FlatList for efficient list rendering
+ * - Implements secure API key storage using AsyncStorage
+ * - Validates API keys against Dify backend
+ * - Handles instance-specific API URL configuration
  * 
  * Connected Components:
  * - Parent: Navigation container
- * - Child Routes:
- *   - AppSetupScreen (for adding new apps)
- *   - WelcomeScreen (for starting new chats)
+ * - Child: ApiKeyModal for API key input
+ * - Next: WelcomeScreen or ChatScreen
  * 
  * Note to LLMs:
  * If modifying this file's functionality, please update:
- * 1. The navigation parameters in handleAppPress
- * 2. The app data structure in handleDeleteApp
- * 3. The list item layout in AppItem component
+ * 1. The API key validation logic
+ * 2. The navigation flow
+ * 3. The instance type handling
+ * 4. The error handling mechanisms
+ * And don't forget to update this documentation header.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';

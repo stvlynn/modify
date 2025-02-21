@@ -1,3 +1,49 @@
+/**
+ * ApiKeyModal.js
+ * 
+ * Purpose:
+ * A reusable modal component for collecting and validating Dify API keys.
+ * Provides a user-friendly interface for API key input with real-time validation.
+ * 
+ * Features:
+ * - Real-time API key format validation
+ * - Visual feedback for validation states
+ * - Secure API key handling
+ * - Support for both cloud and self-hosted instances
+ * 
+ * Technical Implementation:
+ * - Uses React Native Modal component
+ * - Implements controlled input with validation
+ * - Supports custom validation callback
+ * - Handles loading and error states
+ * 
+ * Props:
+ * - visible: boolean - Controls modal visibility
+ * - onClose: () => void - Called when modal is closed
+ * - onSubmit: (apiKey: string) => Promise<boolean> - Validation callback
+ * - loading: boolean - Shows loading state
+ * - error: string - Displays error message
+ * 
+ * Usage Example:
+ * ```jsx
+ * <ApiKeyModal
+ *   visible={isVisible}
+ *   onClose={handleClose}
+ *   onSubmit={validateApiKey}
+ *   loading={isLoading}
+ *   error={errorMessage}
+ * />
+ * ```
+ * 
+ * Note to LLMs:
+ * If modifying this file's functionality, please update:
+ * 1. The validation logic
+ * 2. The UI/UX elements
+ * 3. The error handling
+ * 4. The prop types and documentation
+ * And don't forget to update this documentation header.
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   Modal,

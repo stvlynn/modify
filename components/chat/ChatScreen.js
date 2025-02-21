@@ -3,22 +3,39 @@
  * 
  * Purpose:
  * Main chat interface for interacting with Dify AI.
- * Handles message display, user input, and communication with Dify API.
+ * Provides a user-friendly chat experience with real-time message updates.
  * 
  * Features:
- * - Real-time message display with user/assistant distinction
- * - Message input and sending
- * - Variable-aware conversation handling
+ * - Real-time message exchange with Dify AI
+ * - Support for variable-based conversations
+ * - Message history management
  * - Error handling and retry mechanisms
+ * - Loading states and animations
  * 
- * Navigation Flow:
- * - Entry: From WelcomeScreen or VariableEditScreen
- * - Can return to app list via navigation
+ * Technical Implementation:
+ * - Uses React Native's FlatList for message rendering
+ * - Implements message queuing and state management
+ * - Handles API communication with proper error handling
+ * - Supports message markdown rendering
+ * - Manages keyboard interactions
  * 
  * Data Flow:
  * - Receives app configuration and variables from previous screens
  * - Maintains chat history in local state
  * - Communicates with Dify API for message processing
+ * 
+ * Props (via route.params):
+ * - appConfig: {
+ *     apiUrl: string,
+ *     appId: string,
+ *     appKey: string
+ *   }
+ * - variables: Array<{
+ *     key: string,
+ *     name: string,
+ *     required: boolean
+ *   }>
+ * - inputs: Record<string, string>
  * 
  * Connected Components:
  * - Previous: WelcomeScreen, VariableEditScreen
@@ -30,6 +47,7 @@
  * 2. The chat history management
  * 3. The UI components for message display
  * 4. The API communication logic
+ * And don't forget to update this documentation header.
  */
 
 import React, { useState, useEffect, useRef } from 'react';

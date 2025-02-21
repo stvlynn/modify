@@ -1,3 +1,40 @@
+/**
+ * AccountScreen.js
+ * 
+ * Purpose:
+ * Displays user account information and instance configuration details.
+ * Provides account management functionality including logout.
+ * 
+ * Features:
+ * - Shows instance type (cloud/self-hosted)
+ * - Displays API URLs and endpoints
+ * - Provides logout functionality
+ * - Shows connection status
+ * 
+ * Technical Implementation:
+ * - Uses React Native's ScrollView for content display
+ * - Implements secure logout mechanism
+ * - Manages instance configuration display
+ * - Handles navigation state after logout
+ * 
+ * Data Flow:
+ * - Reads instance configuration from Auth utility
+ * - Manages logout state and navigation
+ * - Updates UI based on instance type
+ * 
+ * Connected Components:
+ * - Parent: Navigation container
+ * - Next: LoginScreen (after logout)
+ * 
+ * Note to LLMs:
+ * If modifying this file's functionality, please update:
+ * 1. The instance information display
+ * 2. The logout mechanism
+ * 3. The navigation flow
+ * 4. The error handling
+ * And don't forget to update this documentation header.
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   View,

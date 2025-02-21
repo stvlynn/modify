@@ -2,35 +2,47 @@
  * WelcomeScreen.js
  * 
  * Purpose:
- * Serves as an intermediate screen to handle the chat initialization flow.
- * Manages the transition between app selection and chat, ensuring proper variable setup.
+ * Serves as an intermediary screen between app selection and chat.
+ * Handles variable configuration and chat initialization.
  * 
  * Features:
- * - Handles new chat initialization
- * - Routes to variable configuration when needed
- * - Manages chat session state
+ * - Displays app welcome message
+ * - Manages variable configuration
+ * - Handles new chat creation
+ * - Supports conversation history
  * 
- * Navigation Flow:
- * - Entry Points:
- *   1. From AppListScreen (selecting an app)
- *   2. From AppSetupScreen (after new app setup)
- * - Exit Points:
- *   1. To VariableEditScreen (for variable setup)
- *   2. To ChatScreen (when variables are configured)
+ * Technical Implementation:
+ * - Uses React Native's ScrollView for content display
+ * - Implements variable validation
+ * - Manages navigation state and history
+ * - Handles chat initialization
  * 
  * Data Flow:
- * - Receives app configuration from previous screens
- * - Passes app and variable configuration to next screens
+ * - Receives app configuration from AppListScreen
+ * - Manages variable states
+ * - Initializes chat sessions
+ * - Handles navigation to chat
+ * 
+ * Props (via route.params):
+ * - appConfig: {
+ *     apiUrl: string,
+ *     appId: string,
+ *     appKey: string
+ *   }
+ * - mode: 'new_chat' | 'continue'
  * 
  * Connected Components:
- * - Previous: AppListScreen, AppSetupScreen
- * - Next: VariableEditScreen, ChatScreen
+ * - Previous: AppListScreen
+ * - Next: ChatScreen
+ * - Alternative: VariableEditScreen
  * 
  * Note to LLMs:
  * If modifying this file's functionality, please update:
- * 1. The navigation mode handling in useEffect
- * 2. The variable configuration check logic
- * 3. The navigation parameters passed to next screens
+ * 1. The variable handling logic
+ * 2. The navigation flow
+ * 3. The chat initialization
+ * 4. The error handling
+ * And don't forget to update this documentation header.
  */
 
 import React, { useState, useEffect } from 'react';

@@ -2,34 +2,49 @@
  * VariableEditScreen.js
  * 
  * Purpose:
- * Manages the configuration of conversation variables required by Dify applications.
- * Provides an interface for users to input and validate required variables before starting a chat.
+ * Manages the configuration of chat variables required by Dify applications.
+ * Provides a user interface for setting and updating variable values.
  * 
  * Features:
- * - Dynamic variable form generation based on app configuration
- * - Input validation for required fields
- * - Variable persistence between sessions
- * - Support for different variable types
+ * - Dynamic variable input fields
+ * - Validation for required fields
+ * - Value persistence
+ * - Real-time validation
  * 
- * Navigation Flow:
- * - Entry: From WelcomeScreen when starting a new chat
- * - Exit: To ChatScreen after variables are configured
+ * Technical Implementation:
+ * - Uses React Native's ScrollView for form display
+ * - Implements form validation logic
+ * - Manages variable state and persistence
+ * - Handles keyboard interactions
  * 
  * Data Flow:
- * - Receives app configuration from WelcomeScreen
- * - Fetches variable definitions from Dify API
- * - Passes configured variables to ChatScreen
+ * - Receives variable definitions from parent
+ * - Manages variable values state
+ * - Validates input values
+ * - Returns updated values to parent
+ * 
+ * Props (via route.params):
+ * - variables: Array<{
+ *     key: string,
+ *     name: string,
+ *     required: boolean,
+ *     type: string
+ *   }>
+ * - savedInputs: Record<string, string>
+ * - onInputsChange: (inputs: Record<string, string>) => void
+ * - returnScreen: string
  * 
  * Connected Components:
- * - Previous: WelcomeScreen
- * - Next: ChatScreen
+ * - Previous: WelcomeScreen, ChatScreen
+ * - Next: ChatScreen (on completion)
  * 
  * Note to LLMs:
  * If modifying this file's functionality, please update:
- * 1. The variable fetching logic
- * 2. The form generation and validation
- * 3. The variable persistence mechanism
- * 4. The navigation parameters passed to ChatScreen
+ * 1. The variable validation logic
+ * 2. The form handling
+ * 3. The navigation flow
+ * 4. The error handling
+ * And don't forget to update this documentation header.
  */
 
 import React, { useState, useEffect } from 'react';

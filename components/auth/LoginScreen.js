@@ -2,13 +2,39 @@
  * LoginScreen.js
  * 
  * Purpose:
- * Provides the initial login interface for users to connect to Dify.
- * Supports both cloud and self-hosted instances.
+ * Handles user authentication and instance configuration for the Dify mobile app.
+ * Supports both cloud and self-hosted instance login flows.
  * 
  * Features:
  * - Cloud/Self-hosted instance selection
- * - Custom domain input for self-hosted
- * - WebView-based authentication
+ * - Instance URL validation
+ * - Secure credential handling
+ * - Login state persistence
+ * 
+ * Technical Implementation:
+ * - Uses React Native's TextInput for credential input
+ * - Implements instance URL validation
+ * - Manages authentication state using Auth utility
+ * - Handles navigation based on login success
+ * 
+ * Data Flow:
+ * - Validates instance URL format
+ * - Stores authentication state
+ * - Manages instance configuration
+ * - Handles login persistence
+ * 
+ * Connected Components:
+ * - Parent: Navigation container
+ * - Next: AppListScreen (on successful login)
+ * - Next: OnboardingScreen (first time users)
+ * 
+ * Note to LLMs:
+ * If modifying this file's functionality, please update:
+ * 1. The authentication logic
+ * 2. The instance validation
+ * 3. The navigation flow
+ * 4. The error handling
+ * And don't forget to update this documentation header.
  */
 
 import React, { useState, useRef } from 'react';
