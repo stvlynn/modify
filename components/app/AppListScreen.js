@@ -31,145 +31,229 @@
  * 3. The list item layout in AppItem component
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  FlatList,
   StyleSheet,
-  Alert,
-  Animated,
-  SafeAreaView,
-  ActivityIndicator,
+  TouchableOpacity,
+  Image,
+  RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { SwipeListView } from 'react-native-swipe-list-view';
-
-const AppItem = ({ item }) => {
-  const appInfo = item.site_info || {};
-  return (
-    <View style={styles.appItem}>
-      <View style={styles.appIconContainer}>
-        <View style={styles.appIcon}>
-          <Text style={styles.appIconText}>🤖</Text>
-        </View>
-      </View>
-      <View style={styles.appInfo}>
-        <Text style={styles.appName}>{appInfo.title || 'Untitled App'}</Text>
-        <Text 
-          style={styles.appDescription}
-          numberOfLines={2}
-        >
-          {appInfo.description || 'No description'}
-        </Text>
-      </View>
-      <Icon name="chevron-forward" size={20} color="#6B7280" />
-    </View>
-  );
-};
+import Logger from '../../utils/logger';
+import Auth from '../../utils/auth';
+import ApiKeyModal from '../common/ApiKeyModal';
 
 const AppListScreen = ({ navigation }) => {
   const [apps, setApps] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedApp, setSelectedApp] = useState(null);
+  const [isApiKeyModalVisible, setIsApiKeyModalVisible] = useState(false);
 
-  useEffect(() => {
-    loadApps();
-  }, []);
-
-  const loadApps = async () => {
+  const fetchApps = async () => {
     try {
-      setLoading(true);
-      const appsJson = await AsyncStorage.getItem('apps');
-      if (appsJson) {
-        setApps(JSON.parse(appsJson));
+      const apiPrefix = await Auth.getApiPrefix();
+      const authToken = await AsyncStorage.getItem('auth_token');
+
+      if (!authToken) {
+        Logger.error('AppList', 'No auth token found');
+        return;
       }
+
+      const response = await fetch(`${apiPrefix}/apps`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch apps: ${response.status}`);
+      }
+
+      const data = await response.json();
+      Logger.debug('AppList', 'Successfully fetched apps', { count: data.data.length });
+      
+      // Sort apps by created_at in descending order
+      const sortedApps = data.data.sort((a, b) => b.created_at - a.created_at);
+      setApps(sortedApps);
+      
+      // Store the latest apps data
+      await AsyncStorage.setItem('apps', JSON.stringify(data));
     } catch (error) {
-      Alert.alert('Error', 'Failed to load apps');
-    } finally {
-      setLoading(false);
+      Logger.error('AppList', 'Failed to fetch apps', error);
     }
   };
 
-  const handleDeleteApp = (appId) => {
-    Alert.alert(
-      'Delete App',
-      'Are you sure you want to delete this app?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const updatedApps = apps.filter(app => app.id !== appId);
-              await AsyncStorage.setItem('apps', JSON.stringify(updatedApps));
-              setApps(updatedApps);
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete app');
-            }
-          },
-        },
-      ],
-    );
-  };
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchApps();
+    setRefreshing(false);
+  }, []);
 
-  const handleAppPress = (app) => {
-    console.log('[AppListScreen] App selected:', app);
-    navigation.navigate('Welcome', {
-      appId: app.id,
-      appConfig: {
-        apiUrl: app.apiUrl,
-        appId: app.appId,
-        appKey: app.appKey
-      },
-      mode: 'new_chat',
-    });
-  };
-
-  const renderHiddenItem = (data) => (
-    <View style={styles.rowBack}>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteApp(data.item.id)}
-      >
-        <Icon name="trash-outline" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-    </View>
+  // 当屏幕获得焦点时刷新一次
+  useFocusEffect(
+    useCallback(() => {
+      fetchApps();
+    }, [])
   );
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+  // 每10秒自动刷新一次
+  useEffect(() => {
+    const intervalId = setInterval(fetchApps, 10000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const handleAppPress = async (app) => {
+    try {
+      // 获取存储的 API Key
+      const storedApiKey = await AsyncStorage.getItem(`app_${app.id}_api_key`);
+      
+      if (!storedApiKey) {
+        // 如果没有 API Key，显示弹窗
+        console.log('[DEBUG] No API Key found, showing modal');
+        setSelectedApp(app);
+        setIsApiKeyModalVisible(true);
+        return;
+      }
+
+      // 验证 API Key
+      console.log('[DEBUG] Validating stored API Key');
+      const isValid = await validateApiKey(app.id, storedApiKey);
+
+      if (!isValid) {
+        // 如果 API Key 无效，显示弹窗
+        console.log('[DEBUG] API Key invalid, showing modal');
+        setSelectedApp(app);
+        setIsApiKeyModalVisible(true);
+        return;
+      }
+
+      // API Key 有效，获取 API URL
+      const instanceType = await Auth.getInstanceType();
+      const apiUrl = instanceType === 'cloud' 
+        ? 'https://api.dify.ai/v1'
+        : await Auth.getPublicApiPrefix();
+
+      console.log('[DEBUG] API Key valid, navigating to Welcome screen');
+      navigation.navigate('Welcome', {
+        appId: app.id,
+        appConfig: {
+          apiUrl: apiUrl,
+          appId: app.id,
+          appKey: storedApiKey,
+        },
+        mode: 'new_chat',
+      });
+    } catch (error) {
+      console.error('[ERROR] Failed to handle app press:', error);
+      Alert.alert(
+        'Error',
+        'Failed to access the app. Please try again later.'
+      );
+    }
+  };
+
+  const validateApiKey = async (appId, apiKey) => {
+    try {
+      // 使用本地 IP 地址替代 localhost
+      const apiUrl = 'http://192.168.1.2:3000/api/apps/validate';
+      console.log('[DEBUG] Validating API Key at URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ app_id: appId })
+      });
+
+      console.log('[DEBUG] Validation response status:', response.status);
+      const responseText = await response.text();
+      console.log('[DEBUG] Raw response:', responseText);
+
+      let isValid = false;
+      try {
+        const data = JSON.parse(responseText);
+        isValid = data.valid === true;
+      } catch (parseError) {
+        console.error('[ERROR] Failed to parse response:', parseError);
+      }
+
+      if (!isValid) {
+        Logger.error('AppList', 'API Key validation failed', {
+          status: response.status,
+          statusText: response.statusText,
+          response: responseText
+        });
+        return false;
+      }
+
+      // 保存有效的 API key，使用一致的键名格式
+      if (isValid) {
+        try {
+          const storageKey = `app_${appId}_api_key`;
+          await AsyncStorage.setItem(storageKey, apiKey);
+          console.log('[DEBUG] API key saved with key:', storageKey);
+        } catch (storageError) {
+          Logger.error('AppList', 'Failed to save API key', storageError);
+          // 即使存储失败，仍然返回验证成功
+        }
+      }
+
+      return isValid;
+    } catch (error) {
+      Logger.error('AppList', 'Error validating API key', {
+        error: error.message,
+        stack: error.stack
+      });
+      return false;
+    }
+  };
+
+  const renderAppItem = ({ item }) => {
+    const iconContent = item.icon_type === 'emoji' ? (
+      <View style={[styles.iconContainer, { backgroundColor: item.icon_background }]}>
+        <Text style={styles.emojiIcon}>{item.icon}</Text>
       </View>
+    ) : (
+      <Image
+        source={{ uri: item.icon_url }}
+        style={styles.imageIcon}
+      />
     );
-  }
+
+    return (
+      <TouchableOpacity
+        style={styles.appItem}
+        onPress={() => handleAppPress(item)}
+      >
+        {iconContent}
+        <View style={styles.appInfo}>
+          <Text style={styles.appName}>{item.name}</Text>
+          <Text style={styles.appDescription} numberOfLines={2}>
+            {item.description || 'No description'}
+          </Text>
+          <Text style={styles.appMode}>{item.mode}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Applications</Text>
-      </View>
-      <SwipeListView
+    <View style={styles.container}>
+      <FlatList
         data={apps}
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            activeOpacity={0.7}
-            onPress={() => handleAppPress(item)}
-          >
-            <View style={styles.rowFront}>
-              <AppItem item={item} />
-            </View>
-          </TouchableOpacity>
-        )}
-        renderHiddenItem={renderHiddenItem}
-        rightOpenValue={-75}
-        disableRightSwipe
-        keyExtractor={item => item.id}
+        renderItem={renderAppItem}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         contentContainerStyle={styles.listContent}
       />
       <View style={styles.fabContainer}>
@@ -179,65 +263,83 @@ const AppListScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('AppSetup')}
         >
           <Text style={styles.fabText}>Add App</Text>
-          <Icon name="add" size={20} color="#FFFFFF" />
+          <Image
+            source={{ uri: 'https://img.icons8.com/ios-filled/50/ffffff/plus.png' }}
+            style={styles.fabIcon}
+          />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+
+      <ApiKeyModal
+        visible={isApiKeyModalVisible}
+        onClose={() => setIsApiKeyModalVisible(false)}
+        selectedApp={selectedApp}
+        validateApiKey={validateApiKey}
+        onSuccess={() => {
+          // 刷新应用列表
+          fetchApps();
+          setIsApiKeyModalVisible(false);
+        }}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    height: 44,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    backgroundColor: '#f5f5f5',
   },
   listContent: {
     padding: 16,
-    paddingBottom: 80,
   },
-  rowFront: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  rowBack: {
-    flex: 1,
+  appItem: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    backgroundColor: '#EF4444',
+    backgroundColor: 'white',
     borderRadius: 12,
+    padding: 16,
     marginBottom: 12,
-    paddingRight: 15,
-    height: '100%',
-    width: '100%',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  deleteButton: {
-    width: 75,
-    height: '100%',
-    alignItems: 'center',
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  emojiIcon: {
+    fontSize: 24,
+  },
+  imageIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    marginRight: 16,
+  },
+  appInfo: {
+    flex: 1,
+  },
+  appName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#333',
+  },
+  appDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  appMode: {
+    fontSize: 12,
+    color: '#999',
+    textTransform: 'capitalize',
   },
   fabContainer: {
     position: 'absolute',
@@ -268,45 +370,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 8,
   },
-  appItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  appIconContainer: {
-    marginRight: 12,
-  },
-  appIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#EBF5FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  appIconText: {
-    fontSize: 20,
-  },
-  appInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  appName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  appDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+  fabIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#FFFFFF',
   },
 });
 
