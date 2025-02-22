@@ -22,6 +22,7 @@ import AppSetupScreen from '../components/app/AppSetupScreen';
 import WelcomeScreen from '../components/welcome/WelcomeScreen';
 import VariableEditScreen from '../components/variables/VariableEditScreen';
 import ChatScreen from '../components/chat/ChatScreen';
+import KnowledgeNavigator from './KnowledgeNavigator';
 
 import Auth from '../utils/auth';
 import Logger from '../utils/logger';
@@ -49,6 +50,16 @@ const AppTabs = () => {
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Icon name="apps" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Knowledge"
+        component={KnowledgeNavigator}
+        options={{
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="book-outline" size={size} color={color} />
           ),
         }}
       />
